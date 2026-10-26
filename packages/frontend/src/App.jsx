@@ -1,4 +1,7 @@
+import { Routes, Route } from 'react-router-dom'
 import React, { useState, useEffect } from "react";
+import Header from "./components/headers/Header.jsx"
+import { createTheme, ThemeProvider } from '@mui/material'
 import "./App.css";
 
 function App() {
@@ -11,13 +14,17 @@ function App() {
       .catch((error) => console.error("Error cargando mensaje.", error));
   }, []);
 
+  const theme = createTheme({
+
+  })
+
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>Monorepo Demo</h1>
-        <p>{message ? message : "Cargando mensaje del backend..."}</p>
-      </header>
-    </div>
+    <ThemeProvider>
+      <Routes>
+
+      </Routes>
+    </ThemeProvider>
   );
 }
 
