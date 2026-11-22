@@ -28,10 +28,10 @@ export function cargarDatosIniciales(repos) {
     new Categoria("Gastronomía", "Ferias, degustaciones y experiencias culinarias"),
   )
 
-  const lucia = repos.usuarios.guardar(new Usuario("Lucía", "Gómez", [], "ORGANIZADOR"))
-  const martin = repos.usuarios.guardar(new Usuario("Martín", "Pérez", [], "ORGANIZADOR"))
-  const sofia = repos.usuarios.guardar(new Usuario("Sofía", "Ruiz", [], "COMPRADOR"))
-  const diego = repos.usuarios.guardar(new Usuario("Diego", "Alonso", [], "COMPRADOR"))
+  const lucia = repos.usuarios.guardar(new Usuario("Lucía", "Gómez", "lucia@aiticket.com", "password123", [], "ORGANIZADOR"))
+  const martin = repos.usuarios.guardar(new Usuario("Martín", "Pérez", "martin@aiticket.com", "password123", [], "ORGANIZADOR"))
+  const sofia = repos.usuarios.guardar(new Usuario("Sofía", "Ruiz", "sofia@aiticket.com", "password123", [], "COMPRADOR"))
+  const diego = repos.usuarios.guardar(new Usuario("Diego", "Alonso", "diego@aiticket.com", "password123", [], "COMPRADOR"))
 
   const festival = repos.eventos.guardar(
     new Evento(

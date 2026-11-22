@@ -2,6 +2,12 @@ import Evento from "../dominio/Evento.js"
 import TipoEntrada from "../dominio/TipoEntrada.js"
 import ErrorDeNegocio from "../dominio/errores/ErrorDeNegocio.js"
 import RepositorioMemoria from "../repositorios/RepositorioMemoria.js"
+import {
+  sanitizarTexto,
+  validarEnteroSeguro,
+  validarIdSeguro,
+  validarUrlOMultimedia,
+} from "../validations/sanitizador.js"
 import { serializarCompra, serializarEvento, serializarTipoEntrada } from "./serializacion.js"
 
 export default class OrganizadorService {
@@ -25,32 +31,70 @@ export default class OrganizadorService {
     const organizador = this.#organizador(usuarioId)
     const { nombre, descripcion, categoriaId, fecha, tiposEntrada = [], multimedia = [] } = datos
 
-    if (!nombre || !descripcion || !fecha) {
-      throw new ErrorDeNegocio("Nombre, descripción y fecha son obligatorios")
+    const nombreLimpio = sanitizarTexto(nombre, 120, "nombre del evento")
+    if (nombreLimpio.length < 3) {
+      throw new ErrorDeNegocio("El nombre del evento debe tener al menos 3 caracteres")
     }
-    const categoria = this.categorias.obtenerPorId(categoriaId)
+
+    const descLimpia = sanitizarTexto(descripcion, 10000, "descripción del evento")
+    if (descLimpia.length < 10) {
+      throw new ErrorDeNegocio("La descripción del evento debe tener al menos 10 caracteres")
+    }
+
+    if (!fecha) {
+      throw new ErrorDeNegocio("La fecha del evento es obligatoria")
+    }
+
+    const catIdSeguro = validarIdSeguro(categoriaId, "categoría")
+    const categoria = this.categorias.obtenerPorId(catIdSeguro)
     if (!categoria) {
       throw new ErrorDeNegocio("Categoría no encontrada", 404)
     }
+
     const fechaEvento = new Date(fecha)
     if (Number.isNaN(fechaEvento.getTime())) {
       throw new ErrorDeNegocio("La fecha del evento no es válida")
     }
-    if (fechaEvento.getTime() <= Date.now()) {
+    const ahora = Date.now()
+    if (fechaEvento.getTime() <= ahora) {
       throw new ErrorDeNegocio("La fecha del evento debe ser futura")
     }
+    // Límite de 5 años hacia adelante
+    if (fechaEvento.getTime() > ahora + 5 * 365 * 24 * 60 * 60 * 1000) {
+      throw new ErrorDeNegocio("La fecha del evento no puede superar los 5 años en el futuro")
+    }
+
     if (!Array.isArray(tiposEntrada) || tiposEntrada.length === 0) {
       throw new ErrorDeNegocio("El evento debe ofrecer al menos un tipo de entrada")
+    }
+    if (tiposEntrada.length > 10) {
+      throw new ErrorDeNegocio("Un evento no puede tener más de 10 tipos de entrada")
+    }
+
+    // Validar multimedia (máximo 10 imágenes, esquemas seguros)
+    if (!Array.isArray(multimedia)) {
+      throw new ErrorDeNegocio("El campo multimedia debe ser una lista")
+    }
+    if (multimedia.length > 10) {
+      throw new ErrorDeNegocio("No se pueden adjuntar más de 10 imágenes por evento")
+    }
+    for (const item of multimedia) {
+      if (!validarUrlOMultimedia(item)) {
+        throw new ErrorDeNegocio(
+          "Formato o esquema de imagen no permitido. Solo se aceptan URLs web seguras o imágenes válidas.",
+          400,
+        )
+      }
     }
 
     const tipos = tiposEntrada.map((tipo) => this.#crearTipoEntrada(tipo))
     const evento = new Evento(
-      String(nombre).trim(),
-      String(descripcion).trim(),
+      nombreLimpio,
+      descLimpia,
       categoria,
       fechaEvento,
       tipos,
-      Array.isArray(multimedia) ? multimedia : [],
+      multimedia,
       organizador,
     )
     this.eventos.guardar(evento)
@@ -58,7 +102,8 @@ export default class OrganizadorService {
   }
 
   comprasDeEvento(usuarioId, eventoId) {
-    const evento = this.#eventoDelOrganizador(usuarioId, eventoId)
+    const eId = validarIdSeguro(eventoId, "eventoId")
+    const evento = this.#eventoDelOrganizador(usuarioId, eId)
     const compras = this.compras
       .buscar((compra) => String(compra.evento.id) === String(evento.id))
       .map((compra) => serializarCompra(compra))
@@ -71,37 +116,47 @@ export default class OrganizadorService {
   }
 
   marcarUtilizada(usuarioId, compraId) {
-    const compra = this.#compraDelOrganizador(usuarioId, compraId)
+    const cId = validarIdSeguro(compraId, "compraId")
+    const compra = this.#compraDelOrganizador(usuarioId, cId)
     compra.marcarUtilizada(compra.evento.organizador)
     return serializarCompra(compra)
   }
 
   enviarMensaje(usuarioId, compraId, texto) {
-    const compra = this.#compraDelOrganizador(usuarioId, compraId)
-    compra.agregarMensaje(compra.evento.organizador, texto)
+    const cId = validarIdSeguro(compraId, "compraId")
+    const compra = this.#compraDelOrganizador(usuarioId, cId)
+    const textoSanitizado = sanitizarTexto(texto, 1000, "mensaje")
+    if (!textoSanitizado) {
+      throw new ErrorDeNegocio("El mensaje no puede estar vacío")
+    }
+    compra.agregarMensaje(compra.evento.organizador, textoSanitizado)
     return serializarCompra(compra)
   }
 
   #crearTipoEntrada(datos) {
     const { nombre, descripcion = "", precio, cupo } = datos
-    if (!nombre) {
-      throw new ErrorDeNegocio("Cada tipo de entrada necesita un nombre")
+    const nombreLimpio = sanitizarTexto(nombre, 60, "nombre del sector")
+    if (!nombreLimpio) {
+      throw new ErrorDeNegocio("Cada tipo de entrada necesita un nombre válido")
     }
+
+    const descLimpia = sanitizarTexto(descripcion, 250, "descripción del sector")
+
     const precioNumero = Number(precio)
-    const cupoNumero = Number(cupo)
-    if (!Number.isFinite(precioNumero) || precioNumero < 0) {
-      throw new ErrorDeNegocio("El precio de cada tipo de entrada debe ser un número mayor o igual a 0")
+    if (!Number.isFinite(precioNumero) || precioNumero < 0 || precioNumero > 10000000) {
+      throw new ErrorDeNegocio("El precio debe ser un número válido entre $0 y $10.000.000")
     }
-    if (!Number.isInteger(cupoNumero) || cupoNumero < 1) {
-      throw new ErrorDeNegocio("El cupo de cada tipo de entrada debe ser un entero mayor a 0")
-    }
-    const tipo = new TipoEntrada(String(nombre).trim(), String(descripcion).trim(), precioNumero, cupoNumero)
+
+    const cupoSeguro = validarEnteroSeguro(cupo, 1, 100000, "cupo")
+
+    const tipo = new TipoEntrada(nombreLimpio, descLimpia, precioNumero, cupoSeguro)
     tipo.id = RepositorioMemoria.nuevoId()
     return tipo
   }
 
   #usuario(usuarioId) {
-    const usuario = this.usuarios.obtenerPorId(usuarioId)
+    const idValido = validarIdSeguro(usuarioId, "usuarioId")
+    const usuario = this.usuarios.obtenerPorId(idValido)
     if (!usuario) {
       throw new ErrorDeNegocio("Usuario no encontrado", 404)
     }
@@ -118,7 +173,8 @@ export default class OrganizadorService {
 
   #eventoDelOrganizador(usuarioId, eventoId) {
     const organizador = this.#organizador(usuarioId)
-    const evento = this.eventos.obtenerPorId(eventoId)
+    const eId = validarIdSeguro(eventoId, "eventoId")
+    const evento = this.eventos.obtenerPorId(eId)
     if (!evento) {
       throw new ErrorDeNegocio("Evento no encontrado", 404)
     }
@@ -130,7 +186,8 @@ export default class OrganizadorService {
 
   #compraDelOrganizador(usuarioId, compraId) {
     const organizador = this.#organizador(usuarioId)
-    const compra = this.compras.obtenerPorId(compraId)
+    const cId = validarIdSeguro(compraId, "compraId")
+    const compra = this.compras.obtenerPorId(cId)
     if (!compra) {
       throw new ErrorDeNegocio("Compra no encontrada", 404)
     }

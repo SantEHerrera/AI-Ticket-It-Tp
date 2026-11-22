@@ -23,8 +23,17 @@ export default class CompradorController {
 
   buscarEventos = (req, res) => {
     try {
-      const { q, categoriaId, orden } = req.query
-      return res.json(this.compradorService.buscarEventos({ texto: q, categoriaId, orden }))
+      const { q, categoriaId, orden, pagina, page, limite, limit, temporal, estado } = req.query
+      return res.json(
+        this.compradorService.buscarEventos({
+          texto: q,
+          categoriaId,
+          orden,
+          pagina: pagina ?? page,
+          limite: limite ?? limit,
+          temporal: temporal ?? estado,
+        }),
+      )
     } catch (error) {
       return manejarError(res, error)
     }

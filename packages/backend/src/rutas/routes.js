@@ -1,12 +1,14 @@
 import { Router } from "express"
 import { getHealth } from "../controllers/HealthController.js"
+import crearAuthRoutes from "./authRoutes.js"
 import crearCompradorRoutes from "./compradorRoutes.js"
 import crearOrganizadorRoutes from "./organizadorRoutes.js"
 
-export default function crearRoutes({ compradorController, organizadorController }) {
+export default function crearRoutes({ authController, compradorController, organizadorController }) {
   const routes = Router()
 
   routes.get("/health", getHealth)
+  routes.use("/auth", crearAuthRoutes(authController))
   routes.get("/usuarios", compradorController.listarUsuarios)
   routes.get("/categorias", compradorController.listarCategorias)
   routes.get("/eventos", compradorController.buscarEventos)

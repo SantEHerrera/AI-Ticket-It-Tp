@@ -1,8 +1,10 @@
 export default class Usuario {
-  constructor(nombre, apellido, favoritos = [], rol = "COMPRADOR") {
+  constructor(nombre, apellido, email = "", password = "password123", favoritos = [], rol = "COMPRADOR") {
     this.nombre = nombre
     this.apellido = apellido
-    this.favoritos = favoritos
+    this.email = String(email || `${nombre.toLowerCase()}@aiticket.com`).trim().toLowerCase()
+    this.password = password
+    this.favoritos = Array.isArray(favoritos) ? favoritos : []
     this.rol = rol
   }
 
@@ -16,6 +18,11 @@ export default class Usuario {
 
   esComprador() {
     return this.rol === "COMPRADOR"
+  }
+
+  validarPassword(passwordIngresada) {
+    if (!this.password || !passwordIngresada) return false
+    return String(this.password) === String(passwordIngresada)
   }
 
   tieneFavorito(eventoId) {

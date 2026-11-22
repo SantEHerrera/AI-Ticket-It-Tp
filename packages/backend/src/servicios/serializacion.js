@@ -9,6 +9,7 @@ export function serializarUsuario(usuario) {
     nombre: usuario.nombre,
     apellido: usuario.apellido,
     nombreCompleto: usuario.nombreCompleto(),
+    email: usuario.email || "",
     rol: usuario.rol,
     favoritos: [...usuario.favoritos],
   }
